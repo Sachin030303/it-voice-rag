@@ -1,0 +1,13 @@
+Linux Server High CPU Runbook
+
+## Identify the process
+Run `top` or `htop` and sort by CPU. Note the PID and command. Use `ps aux --sort=-%cpu | head` for a snapshot.
+
+## Check load and I/O wait
+Run `uptime` to view load averages. If load is high but CPU user time is low, the bottleneck is disk. Run `iostat -x 1` and look for high await values.
+
+## Common causes
+A runaway cron job, a misbehaving web worker, or a memory leak causing swapping. Check `journalctl -u nginx --since "30 min ago"` and `df -h` for full disks.
+
+## Safe remediation
+Restart the affected service with `systemctl restart <service>`. Only use `kill -9` as a last resort. After recovery, add alerting for CPU above 85% for five minutes.

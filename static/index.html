@@ -1,0 +1,990 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signal — IT Voice Assistant</title>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+    :root {
+      color-scheme: dark;
+      --bg: #080a12;
+      --panel: #101321;
+      --line: #252a40;
+      --muted: #9299b8;
+      --text: #f3f4ff;
+      --blue: #6284ff;
+      --violet: #a16cff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 55% -20%, #25204d, transparent 45%), var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; color: inherit; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 230px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      padding: 25px 16px;
+      border-right: 1px solid var(--line);
+      background: #0b0d17;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 35px;
+    }
+
+    .logo {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #5c8aff, #a45cff);
+      font-size: 22px;
+    }
+
+    .brand strong {
+      font: 700 22px 'Space Grotesk';
+    }
+
+    .brand small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+
+    .navlabel {
+      margin-bottom: 12px;
+      color: #777f9f;
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+
+    .nav button {
+      display: block;
+      width: 100%;
+      margin-bottom: 6px;
+      padding: 12px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: #b4bad4;
+      text-align: left;
+    }
+
+    .nav button:hover,
+    .nav button.active {
+      background: #20203b;
+      color: white;
+    }
+
+    .statusbox {
+      margin-top: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #111525;
+      font-size: 12px;
+    }
+
+    .statusbox p {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .main {
+      width: 100%;
+      max-width: 1500px;
+      min-width: 0;
+      margin: auto;
+      padding: 30px clamp(16px, 4vw, 50px);
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      color: #9c9cff;
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    h1 { font-size: clamp(25px, 3vw, 34px); }
+
+    .pill {
+      padding: 8px 12px;
+      border: 1px solid #353657;
+      border-radius: 30px;
+      background: #171a31;
+      color: #c6caff;
+      font-size: 11px;
+    }
+
+    .outline {
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #111525;
+    }
+
+    .hero {
+      padding: 25px;
+      border: 1px solid #39365d;
+      border-radius: 20px;
+      background: linear-gradient(115deg, #171b35, #151329 55%, #21163c);
+    }
+
+    .hero h2 { margin-bottom: 8px; }
+
+    .hero p {
+      color: #aeb3d1;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .composer {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 22px;
+      padding: 8px;
+      border: 1px solid #373454;
+      border-radius: 14px;
+      background: #0c0e1b;
+    }
+
+    .composer input {
+      flex: 1;
+      width: 0;
+      min-width: 0;
+      padding: 12px;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: white;
+    }
+
+    .composer input::placeholder { color: #747b9e; }
+
+    .mic, .send {
+      display: grid;
+      flex-shrink: 0;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border: 1px solid #363b59;
+      border-radius: 12px;
+      background: #1b2037;
+      font-size: 19px;
+    }
+
+    .mic.recording {
+      border-color: #ff7098;
+      background: #542239;
+      box-shadow: 0 0 0 4px #ff70981a;
+    }
+
+    .send {
+      border: 0;
+      background: linear-gradient(135deg, #6688ff, #9b63ff);
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: #9299b8;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 22px 0;
+    }
+
+    .stat, .panel {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(145deg, #121627, #0e111e);
+    }
+
+    .stat small {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 7px;
+      font: 600 21px 'Space Grotesk';
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 13px;
+    }
+
+    .section-head h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(250px, .8fr);
+      gap: 16px;
+    }
+
+    .answer {
+      min-height: 160px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: #dce0f6;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .source-list { display: grid; gap: 10px; }
+
+    .source {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #121626;
+      overflow-wrap: anywhere;
+    }
+
+    .source b { font-size: 12px; }
+
+    .source p {
+      color: #a3abc9;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .source small { color: var(--muted); }
+
+    .suggestions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .suggestion {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #101321;
+      color: #c7cbea;
+      text-align: left;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .suggestion:hover { border-color: #7779ff; }
+
+    .suggestion strong {
+      display: block;
+      margin-bottom: 5px;
+      color: white;
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 10;
+      display: none;
+      max-width: calc(100vw - 40px);
+      padding: 14px 18px;
+      border: 1px solid #414969;
+      border-radius: 12px;
+      background: #191e32;
+      font-size: 12px;
+    }
+
+    .upload-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: #03040acc;
+    }
+
+    .upload-modal.open { display: flex; }
+
+    .modal {
+      width: min(470px, 100%);
+      padding: 24px;
+      border: 1px solid #363b59;
+      border-radius: 18px;
+      background: #111524;
+    }
+
+    .modal p {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .modal input, .modal select {
+      width: 100%;
+      margin-top: 7px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0c0f1b;
+      color: white;
+    }
+
+    .modal label {
+      display: block;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .primary, .subtle {
+      padding: 11px 15px;
+      border: 0;
+      border-radius: 9px;
+    }
+
+    .primary {
+      background: linear-gradient(135deg, #6688ff, #9b63ff);
+    }
+
+    .subtle { background: #20243a; }
+
+    @media(max-width: 900px) {
+      .app { grid-template-columns: 72px minmax(0, 1fr); }
+      .sidebar { padding: 20px 8px; }
+      .brand { justify-content: center; }
+      .brand-text, .navlabel, .nav button .navtext, .statusbox { display: none; }
+      .content-grid { grid-template-columns: 1fr; }
+    }
+
+    @media(max-width: 560px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main { padding: 18px 12px; }
+      .hero { padding: 17px; }
+      .stats { gap: 7px; }
+      .stat { padding: 10px; }
+      .stat strong { font-size: 16px; }
+      .suggestions { grid-template-columns: 1fr; }
+      .topbar { align-items: flex-start; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">◉</div>
+      <div class="brand-text">
+        <strong>signal.</strong>
+        <small>INTELLIGENT SUPPORT</small>
+      </div>
+    </div>
+
+    <div class="navlabel">WORKSPACE</div>
+    <nav class="nav">
+      <button class="active">⌘ <span class="navtext">AI Assistant</span></button>
+      <button id="uploadNav">＋ <span class="navtext">Knowledge base</span></button>
+      <button id="sourcesNav">▤ <span class="navtext">Retrieved sources</span></button>
+    </nav>
+
+    <div class="statusbox">
+      <strong id="sideStatus">Connecting to API</strong>
+      <p>Knowledge engine and language model status.</p>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">YOUR AI SUPPORT DESK</div>
+        <h1>Let's solve something.</h1>
+      </div>
+      <div>
+        <span class="pill" id="apiLabel">Checking system</span>
+        <button class="outline" id="openUpload">＋ Add documents</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <span class="pill">✦ RAG-POWERED ASSISTANT</span>
+      <h2>What can I help you fix today?</h2>
+      <p>Describe your IT issue. Get clear answers grounded in your troubleshooting documents.</p>
+
+      <div class="composer">
+        <button class="mic" id="mic" type="button"
+          title="Click to speak; click again to stop"
+          aria-label="Start microphone">♩</button>
+
+        <input id="question" type="text"
+          placeholder="e.g. My laptop connects to Wi-Fi but has no internet…"
+          autocomplete="off">
+
+        <button class="send" id="send" type="button" aria-label="Send question">↗</button>
+      </div>
+
+      <div class="hint" id="speechHint" aria-live="polite">
+        Voice input works best in Chrome or Edge. Click the microphone to speak.
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="stat">
+        <small>Knowledge chunks</small>
+        <strong id="chunkCount">—</strong>
+      </div>
+      <div class="stat">
+        <small>Retrieval mode</small>
+        <strong style="font-size:17px">Hybrid search</strong>
+      </div>
+      <div class="stat">
+        <small>Latest response</small>
+        <strong id="responseTime">—</strong>
+      </div>
+    </section>
+
+    <div class="section-head">
+      <h3>Conversation workspace</h3>
+      <button class="outline" id="clear">↻ New conversation</button>
+    </div>
+
+    <div class="content-grid">
+      <section class="panel">
+        <div class="section-head">
+          <h3>AI response</h3>
+          <span class="pill" id="answerState">READY</span>
+        </div>
+
+        <div class="answer" id="answer">
+          Your next fix starts here. Ask a question or choose a common issue below.
+        </div>
+
+        <p id="timings" class="hint"></p>
+
+        <label style="font-size:12px">
+          <input type="checkbox" id="tts">
+          Read answer aloud
+        </label>
+      </section>
+
+      <section class="panel" id="sourcePanel">
+        <div class="section-head">
+          <h3>Knowledge sources</h3>
+          <span id="sourceCount">0 sources</span>
+        </div>
+        <div class="source-list" id="sources">
+          <p class="hint">Sources will appear here with each answer.</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="section-head" style="margin-top:25px">
+      <h3>Quick-start prompts</h3>
+    </div>
+
+    <div class="suggestions">
+      <button class="suggestion" data-q="My laptop won't boot and the battery light is blinking.">
+        <strong>◉ Laptop won't boot</strong>
+        Power, battery and startup troubleshooting
+      </button>
+      <button class="suggestion" data-q="I am connected to Wi-Fi but have no internet access.">
+        <strong>⌁ Wi-Fi, no internet</strong>
+        Network connection diagnostics
+      </button>
+      <button class="suggestion" data-q="My VPN connects but I cannot access internal resources.">
+        <strong>⛨ VPN connection issue</strong>
+        Remote access and VPN checks
+      </button>
+    </div>
+  </main>
+</div>
+
+<div class="upload-modal" id="uploadModal">
+  <div class="modal">
+    <h3>Add to your knowledge base</h3>
+    <p>Upload a troubleshooting guide or internal manual.</p>
+
+    <form id="uploadForm">
+      <label>Choose document
+        <input type="file" id="file" name="file"
+          accept=".pdf,.docx,.txt,.md" required>
+      </label>
+
+      <label>Category
+        <select name="category">
+          <option value="">Auto-detect</option>
+          <option value="network">Network</option>
+          <option value="vpn">VPN</option>
+          <option value="server">Server</option>
+          <option value="laptop">Laptop</option>
+          <option value="software">Software</option>
+          <option value="general">General</option>
+        </select>
+      </label>
+
+      <label>Topic
+        <input name="topic" placeholder="e.g. VPN access">
+      </label>
+
+      <label>Site / business unit
+        <input name="district" placeholder="global (default)">
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" class="subtle" id="closeUpload">Cancel</button>
+        <button type="submit" class="primary" id="uploadSubmit">Upload & index</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  let sessionId = 's' + Math.random().toString(36).slice(2);
+  let recognition = null;
+  let answerText = '';
+  let busy = false;
+
+  function toast(message) {
+    const element = $('toast');
+    element.textContent = message;
+    element.style.display = 'block';
+
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => {
+      element.style.display = 'none';
+    }, 4000);
+  }
+
+  function setBusy(value) {
+    busy = value;
+    $('send').disabled = value;
+    $('answerState').textContent = value ? 'THINKING' : 'READY';
+  }
+
+  async function checkHealth() {
+    try {
+      const response = await fetch('/health');
+      if (!response.ok) throw new Error('Health check failed');
+
+      const data = await response.json();
+      $('chunkCount').textContent = (data.chunks ?? 0).toLocaleString();
+      $('apiLabel').textContent = 'System online';
+      $('sideStatus').textContent = 'API connected';
+    } catch (error) {
+      $('apiLabel').textContent = 'API unavailable';
+      $('sideStatus').textContent = 'API unavailable';
+      $('chunkCount').textContent = '—';
+    }
+  }
+
+  function makeSource(source) {
+    const card = document.createElement('article');
+    card.className = 'source';
+
+    const title = document.createElement('b');
+    title.textContent = '[' + (source.n ?? '') + '] ' +
+      (source.source || 'Knowledge source');
+    card.appendChild(title);
+
+    const snippet = document.createElement('p');
+    snippet.textContent = source.snippet || source.section || 'Retrieved context';
+    card.appendChild(snippet);
+
+    const meta = document.createElement('small');
+    meta.textContent = [
+      source.section,
+      source.category,
+      source.similarity != null
+        ? 'Match ' + Math.round(source.similarity * 100) + '%'
+        : null
+    ].filter(Boolean).join(' · ');
+
+    card.appendChild(meta);
+    return card;
+  }
+
+  async function ask(question) {
+    const query = (question || '').trim();
+    if (!query || busy) return;
+
+    $('question').value = query;
+    $('answer').textContent = 'Searching your knowledge base…';
+    $('sources').replaceChildren();
+    $('sourceCount').textContent = 'Searching…';
+    $('timings').textContent = '';
+    answerText = '';
+
+    setBusy(true);
+    $('answerState').textContent = 'SEARCHING';
+
+    try {
+      const response = await fetch('/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          session_id: sessionId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Request failed (' + response.status + '). Check the backend logs.');
+      }
+
+      if (!response.body) {
+        throw new Error('Streaming response is not supported by this browser.');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+
+        buffer += decoder.decode(result.value, { stream: true });
+
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          const eventMatch = part.match(/event:\s*(\w+)/);
+          const dataMatch = part.match(/data:\s*([\s\S]*)/);
+
+          if (!eventMatch || !dataMatch) continue;
+
+          let data;
+          try {
+            data = JSON.parse(dataMatch[1]);
+          } catch {
+            continue;
+          }
+
+          if (eventMatch[1] === 'sources') {
+            const sources = data.sources || [];
+            $('sources').replaceChildren();
+
+            if (sources.length) {
+              sources.forEach(source => {
+                $('sources').appendChild(makeSource(source));
+              });
+            } else {
+              $('sources').textContent = 'No matching sources found.';
+            }
+
+            $('sourceCount').textContent =
+              sources.length + (sources.length === 1 ? ' source' : ' sources');
+
+            $('answerState').textContent = 'GENERATING';
+          }
+
+          if (eventMatch[1] === 'token') {
+            answerText += data;
+            $('answer').textContent = answerText;
+          }
+
+          if (eventMatch[1] === 'done') {
+            const timings = data.timings_ms || {};
+            $('timings').textContent =
+              'First token: ' + (timings.time_to_first_token ?? '—') +
+              ' ms · Retrieval: ' + (timings.retrieval ?? '—') +
+              ' ms · Total: ' + (timings.total ?? '—') + ' ms';
+
+            $('responseTime').textContent =
+              (timings.total ?? '—') + ' ms';
+          }
+        }
+      }
+
+      if (!answerText) {
+        $('answer').textContent =
+          'No answer was generated. Try rephrasing your question.';
+      }
+
+      if ($('tts').checked && answerText && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(
+          new SpeechSynthesisUtterance(answerText.replace(/\[\d+\]/g, ''))
+        );
+      }
+    } catch (error) {
+      $('answer').textContent = 'Could not reach the assistant: ' + error.message;
+      $('sourceCount').textContent = '0 sources';
+      toast(error.message);
+    } finally {
+      setBusy(false);
+      $('answerState').textContent = answerText ? 'COMPLETE' : 'READY';
+    }
+  }
+
+  $('send').addEventListener('click', () => {
+    ask($('question').value);
+  });
+
+  $('question').addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      ask($('question').value);
+    }
+  });
+
+  document.querySelectorAll('[data-q]').forEach(button => {
+    button.addEventListener('click', () => ask(button.dataset.q));
+  });
+
+  function openUpload() {
+    $('uploadModal').classList.add('open');
+  }
+
+  function closeUpload() {
+    $('uploadModal').classList.remove('open');
+  }
+
+  $('openUpload').addEventListener('click', openUpload);
+  $('uploadNav').addEventListener('click', openUpload);
+  $('closeUpload').addEventListener('click', closeUpload);
+
+  $('uploadModal').addEventListener('click', event => {
+    if (event.target === $('uploadModal')) closeUpload();
+  });
+
+  $('uploadForm').addEventListener('submit', async event => {
+    event.preventDefault();
+
+    const file = $('file').files[0];
+    if (!file) return;
+
+    const button = $('uploadSubmit');
+    button.disabled = true;
+    button.textContent = 'Indexing…';
+
+    try {
+      const formData = new FormData(event.target);
+
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Upload failed');
+      }
+
+      toast('Indexed ' + data.source + ' · ' + data.chunks + ' chunks');
+      closeUpload();
+      event.target.reset();
+      checkHealth();
+    } catch (error) {
+      toast(error.message);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Upload & index';
+    }
+  });
+
+  $('clear').addEventListener('click', async () => {
+    try {
+      await fetch('/session/' + encodeURIComponent(sessionId), {
+        method: 'DELETE'
+      });
+    } catch (error) {
+      console.warn('Could not clear server session:', error);
+    }
+
+    sessionId = 's' + Math.random().toString(36).slice(2);
+    answerText = '';
+    $('question').value = '';
+    $('answer').textContent = 'Your next fix starts here. Ask a question.';
+    $('sources').textContent = 'Sources will appear here with each answer.';
+    $('sourceCount').textContent = '0 sources';
+    $('timings').textContent = '';
+    $('responseTime').textContent = '—';
+    $('answerState').textContent = 'READY';
+  });
+
+  $('sourcesNav').addEventListener('click', () => {
+    $('sourcePanel').scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
+  });
+
+  // ----------------------------------------------------
+  // MICROPHONE / SPEECH RECOGNITION
+  // ----------------------------------------------------
+
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  const micButton = $('mic');
+  const speechHint = $('speechHint');
+
+  let isListening = false;
+  let finalTranscript = '';
+
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      isListening = true;
+      finalTranscript = '';
+
+      micButton.classList.add('recording');
+      micButton.textContent = '■';
+      micButton.setAttribute('aria-label', 'Stop recording');
+
+      speechHint.textContent = 'Listening… speak now, then pause.';
+    };
+
+    recognition.onresult = event => {
+      let interimTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript;
+
+        if (event.results[i].isFinal) {
+          finalTranscript += text + ' ';
+        } else {
+          interimTranscript += text;
+        }
+      }
+
+      $('question').value =
+        (finalTranscript + interimTranscript).trim();
+    };
+
+    recognition.onerror = event => {
+      const messages = {
+        'not-allowed':
+          'Microphone permission denied. Allow microphone access in Chrome site settings.',
+        'service-not-allowed':
+          'The browser speech recognition service is blocked.',
+        'no-speech':
+          'No speech detected. Click the microphone and try again.',
+        'audio-capture':
+          'No microphone detected. Check your Windows input device.',
+        'network':
+          'Speech recognition network error. Check your internet connection.',
+        'aborted':
+          'Recording was cancelled.'
+      };
+
+      const message =
+        messages[event.error] || 'Microphone error: ' + event.error;
+
+      speechHint.textContent = message;
+      toast(message);
+      console.error('Speech recognition error:', event.error);
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      micButton.classList.remove('recording');
+      micButton.textContent = '♩';
+      micButton.setAttribute('aria-label', 'Start microphone');
+
+      const transcript = finalTranscript.trim();
+
+      if (transcript) {
+        $('question').value = transcript;
+        speechHint.textContent = 'Voice captured. Sending your question…';
+        ask(transcript);
+      } else {
+        speechHint.textContent =
+          'No speech captured. Click the microphone and try again.';
+      }
+    };
+
+    micButton.addEventListener('click', () => {
+      if (isListening) {
+        recognition.stop();
+        return;
+      }
+
+      try {
+        finalTranscript = '';
+        recognition.start();
+      } catch (error) {
+        console.error('Could not start speech recognition:', error);
+        toast('Could not start microphone. Refresh the page and try again.');
+      }
+    });
+  } else {
+    micButton.style.opacity = '0.6';
+    speechHint.textContent =
+      'Speech recognition is unsupported in this browser. Try updated Chrome or Edge.';
+
+    micButton.addEventListener('click', () => {
+      toast('Use an updated Chrome or Edge browser for voice input.');
+    });
+  }
+
+  checkHealth();
+</script>
+</body>
+</html>
