@@ -22,7 +22,7 @@ def _tok(text: str):
 
 class Store:
     def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise RuntimeError(
                 "Set GEMINI_API_KEY in your environment before starting the app."
