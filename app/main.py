@@ -1,4 +1,6 @@
+
 import json
+import logging
 import time
 from collections import defaultdict
 
@@ -10,16 +12,32 @@ from pydantic import BaseModel, Field
 from . import config, ingest, llm
 from .store import Store
 
-app = FastAPI(title="IT Troubleshooting Voice Assistant", version="1.0")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="IT Troubleshooting Voice Assistant",
+    version="1.0",
+)
+
 store: Store | None = None
-sessions: dict[str, list] = defaultdict(list)  # session_id -> [(role, text)]
+sessions: dict[str, list] = defaultdict(list)
 
 
 @app.on_event("startup")
-def _startup():
+def startup():
     global store
     store = Store()
-    store.embed_query("warmup")  # load model weights at boot, not on the first user query
+    logger.info("Store initialized successfully.")
+
+
+def get_store() -> Store:
+    if store is None:
+        raise HTTPException(
+            status_code=503,
+            detail="The knowledge store is not initialized.",
+        )
+    return store
 
 
 class Filters(BaseModel):
@@ -32,9 +50,11 @@ class Filters(BaseModel):
 class RetrieveReq(BaseModel):
     query: str
     top_k: int = Field(default=config.TOP_K, ge=1, le=20)
-    threshold: float = Field(default=config.SIM_THRESHOLD, ge=0, le=1)
+    threshold: float = Field(
+        default=config.SIM_THRESHOLD, ge=0, le=1
+    )
     hybrid: bool = True
-    filters: Filters = Filters()
+    filters: Filters = Field(default_factory=Filters)
 
 
 class QueryReq(RetrieveReq):
@@ -42,80 +62,240 @@ class QueryReq(RetrieveReq):
     rewrite: bool = True
 
 
-def _public(chunks):
-    return [{"n": i, "source": c["metadata"]["source"], "section": c["metadata"].get("section"),
-             "category": c["metadata"].get("category"), "similarity": c["similarity"],
-             "snippet": c["text"][:240]} for i, c in enumerate(chunks, 1)]
+def public_chunks(chunks):
+    return [
+        {
+            "n": i,
+            "source": chunk["metadata"].get("source", "Unknown"),
+            "section": chunk["metadata"].get("section"),
+            "category": chunk["metadata"].get("category"),
+            "similarity": chunk["similarity"],
+            "snippet": chunk["text"][:240],
+        }
+        for i, chunk in enumerate(chunks, 1)
+    ]
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", **store.stats(), "embed_model": config.EMBED_MODEL, "llm": config.LLM_MODEL}
+    current_store = get_store()
+    return {
+        "status": "ok",
+        **current_store.stats(),
+        "embed_model": config.EMBED_MODEL,
+        "llm": config.LLM_MODEL,
+    }
 
 
 @app.post("/upload")
-async def upload(file: UploadFile = File(...), category: str = Form(None), topic: str = Form(None),
-                 district: str = Form(None)):
+async def upload(
+    file: UploadFile = File(...),
+    category: str | None = Form(default=None),
+    topic: str | None = Form(default=None),
+    district: str | None = Form(default=None),
+):
+    current_store = get_store()
     data = await file.read()
+
     try:
-        text = ingest.extract_text(file.filename, data)
-    except ValueError as e:
-        raise HTTPException(415, str(e))
+        text = ingest.extract_text(file.filename or "upload", data)
+    except ValueError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+
     if not text.strip():
-        raise HTTPException(422, "No extractable text (scanned PDF? run OCR first).")
-    t0 = time.perf_counter()
-    chunks = ingest.chunk_text(text, config.CHUNK_CHARS, config.CHUNK_OVERLAP_PARAS)
-    meta = {"category": category or ingest.infer_category(text, file.filename),
-            "topic": topic or file.filename.rsplit(".", 1)[0].replace("_", " "),
-            "district": district or "global"}
-    n = store.add(file.filename, chunks, meta)
-    return {"source": file.filename, "chunks": n, "metadata": meta, "ingest_ms": round((time.perf_counter() - t0) * 1000)}
+        raise HTTPException(
+            status_code=422,
+            detail="No extractable text. Scanned PDFs may need OCR.",
+        )
+
+    started = time.perf_counter()
+    chunks = ingest.chunk_text(
+        text,
+        config.CHUNK_CHARS,
+        config.CHUNK_OVERLAP_PARAS,
+    )
+
+    metadata = {
+        "category": category or ingest.infer_category(
+            text, file.filename or "upload"
+        ),
+        "topic": topic or (
+            (file.filename or "upload").rsplit(".", 1)[0]
+            .replace("_", " ")
+        ),
+        "district": district or "global",
+    }
+
+    try:
+        count = current_store.add(
+            file.filename or "upload",
+            chunks,
+            metadata,
+        )
+    except Exception as exc:
+        logger.exception("Document ingestion failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Document embedding or storage failed. Check server logs.",
+        ) from exc
+
+    return {
+        "source": file.filename,
+        "chunks": count,
+        "metadata": metadata,
+        "ingest_ms": round(
+            (time.perf_counter() - started) * 1000
+        ),
+    }
 
 
 @app.post("/retrieve")
 def retrieve(req: RetrieveReq):
-    t0 = time.perf_counter()
-    res = store.search(req.query, req.top_k, req.threshold, req.filters.model_dump(), req.hybrid)
-    return {"query": req.query, "results": res, "retrieval_ms": round((time.perf_counter() - t0) * 1000)}
+    current_store = get_store()
+    started = time.perf_counter()
+
+    try:
+        results = current_store.search(
+            req.query,
+            req.top_k,
+            req.threshold,
+            req.filters.model_dump(exclude_none=True),
+            req.hybrid,
+        )
+    except Exception as exc:
+        logger.exception("Retrieval failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Retrieval failed. Check server logs.",
+        ) from exc
+
+    return {
+        "query": req.query,
+        "results": results,
+        "retrieval_ms": round(
+            (time.perf_counter() - started) * 1000
+        ),
+    }
 
 
-def _sse(event: str, data) -> str:
+def sse(event: str, data) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
 @app.post("/query")
 async def query(req: QueryReq):
+    current_store = get_store()
     history = sessions[req.session_id]
 
-    async def gen():
-        t0 = time.perf_counter()
-        q = await llm.rewrite_query(req.query, history) if req.rewrite else req.query
-        t1 = time.perf_counter()
-        chunks = store.search(q, req.top_k, req.threshold, req.filters.model_dump(), req.hybrid)
-        t2 = time.perf_counter()
-        yield _sse("sources", {"rewritten_query": q, "sources": _public(chunks)})
-        answer, first = [], None
-        async for tok in llm.stream_answer(req.query, chunks, history):
-            if first is None:
-                first = time.perf_counter()
-            answer.append(tok)
-            yield _sse("token", tok)
-        history.extend([("user", req.query), ("assistant", "".join(answer))])
-        del history[:-2 * config.MAX_HISTORY_TURNS]
-        yield _sse("done", {"timings_ms": {"rewrite": round((t1 - t0) * 1000), "retrieval": round((t2 - t1) * 1000),
-                                           "time_to_first_token": round(((first or t2) - t0) * 1000),
-                                           "total": round((time.perf_counter() - t0) * 1000)}})
+    async def generate():
+        started = time.perf_counter()
+        first_token_time = None
 
-    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        try:
+            rewritten_query = (
+                await llm.rewrite_query(req.query, history)
+                if req.rewrite and history
+                else req.query
+            )
+            rewrite_finished = time.perf_counter()
+
+            chunks = current_store.search(
+                rewritten_query,
+                req.top_k,
+                req.threshold,
+                req.filters.model_dump(exclude_none=True),
+                req.hybrid,
+            )
+            retrieval_finished = time.perf_counter()
+
+            yield sse(
+                "sources",
+                {
+                    "rewritten_query": rewritten_query,
+                    "sources": public_chunks(chunks),
+                },
+            )
+
+            answer_parts = []
+
+            async for token in llm.stream_answer(
+                req.query, chunks, history
+            ):
+                if first_token_time is None:
+                    first_token_time = time.perf_counter()
+
+                answer_parts.append(token)
+                yield sse("token", token)
+
+            answer = "".join(answer_parts)
+
+            history.extend([
+                ("user", req.query),
+                ("assistant", answer),
+            ])
+
+            max_messages = 2 * config.MAX_HISTORY_TURNS
+            if len(history) > max_messages:
+                del history[:-max_messages]
+
+            finished = time.perf_counter()
+
+            yield sse(
+                "done",
+                {
+                    "timings_ms": {
+                        "rewrite": round(
+                            (rewrite_finished - started) * 1000
+                        ),
+                        "retrieval": round(
+                            (retrieval_finished - rewrite_finished) * 1000
+                        ),
+                        "time_to_first_token": round(
+                            (
+                                (first_token_time or finished) - started
+                            ) * 1000
+                        ),
+                        "total": round(
+                            (finished - started) * 1000
+                        ),
+                    }
+                },
+            )
+
+        except Exception:
+            logger.exception("Question processing failed")
+            # The response has already started, so report the error in SSE.
+            yield sse(
+                "error",
+                {
+                    "message": (
+                        "The assistant could not complete this question. "
+                        "Check the backend logs for details."
+                    )
+                },
+            )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.delete("/session/{session_id}")
-def clear(session_id: str):
+def clear_session(session_id: str):
     sessions.pop(session_id, None)
     return {"cleared": session_id}
 
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount(
+    "/static",
+    StaticFiles(directory="static"),
+    name="static",
+)
 
 
 @app.get("/")

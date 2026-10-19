@@ -4,14 +4,32 @@
 .env.*
 !.env.example
 
+# Python virtual environment
 .venv/
 venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
+
+# IDE settings
 .vscode/
 .idea/
 
+# Node.js dependencies
+node_modules/
+**/node_modules/
+
+# Frontend build output
+dist/
+build/
+.next/
+out/
+
+# Application data and logs
 data/
 *.log
+
+# OS files
+.DS_Store
+Thumbs.db
